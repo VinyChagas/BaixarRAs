@@ -48,6 +48,46 @@ export function uniqueFileName(basePath, originalName) {
 }
 
 /**
+ * Lista arquivos no diretório (exclui .crdownload e .tmp)
+ */
+export function listFiles(dirPath) {
+  if (!dirPath || !fs.existsSync(dirPath)) return [];
+  return fs.readdirSync(dirPath).filter((f) => {
+    if (f.endsWith('.crdownload') || f.endsWith('.tmp')) return false;
+    const fullPath = path.join(dirPath, f);
+    return fs.statSync(fullPath).isFile();
+  });
+}
+
+/**
+ * Retorna snapshot dos arquivos com mtime para comparação
+ */
+export function getFileSnapshot(dirPath) {
+  if (!dirPath || !fs.existsSync(dirPath)) return { files: [], time: Date.now() };
+  const files = fs.readdirSync(dirPath);
+  const result = [];
+  for (const f of files) {
+    if (f.endsWith('.crdownload')) continue;
+    const fullPath = path.join(dirPath, f);
+    try {
+      const stat = fs.statSync(fullPath);
+      if (stat.isFile()) result.push({ name: f, mtime: stat.mtimeMs });
+    } catch {}
+  }
+  return { files: result, time: Date.now() };
+}
+
+/**
+ * Retorna o arquivo mais recente no diretório
+ */
+export function getLatestDownloadedFile(dirPath) {
+  const files = listNewFilesSince(dirPath, 0);
+  if (files.length === 0) return null;
+  files.sort((a, b) => b.mtime - a.mtime);
+  return files[0];
+}
+
+/**
  * Lista arquivos novos desde um timestamp (exclui .crdownload)
  */
 export function listNewFilesSince(dirPath, sinceTime) {

@@ -208,11 +208,27 @@ export const timelineSelectors = {
   },
 };
 
-/** Tela de anexos */
+/** Tela de anexos - Consulta de Anexos */
 export const attachmentSelectors = {
-  downloadButtons: {
-    css: '#page\\:frmre_consulta_anexos\\:ssBTOREAnexosGrid0 tbody tr td:nth-child(2) input',
+  /** Grid de anexos - linhas da tabela */
+  grid: {
+    css: '#page\\:frmre_consulta_anexos\\:ssBTOREAnexosGrid0',
+    xpath: '//*[@id="page:frmre_consulta_anexos:ssBTOREAnexosGrid0"]',
+  },
+  rows: {
+    css: '#page\\:frmre_consulta_anexos\\:ssBTOREAnexosGrid0 tbody tr',
+    xpath: '//*[@id="page:frmre_consulta_anexos:ssBTOREAnexosGrid0"]/tbody/tr',
+  },
+  /** input type="image" - elemento real de download (Abrir/Salvar Anexo) */
+  downloadImageInput: {
+    css: '#page\\:frmre_consulta_anexos\\:ssBTOREAnexosGrid0 > tbody > tr > td:nth-child(2) > input[type="image"]',
+    cssAlt: 'input[type="image"][alt="Abrir/Salvar Anexo"]',
+    cssByAlt: 'input[alt="Abrir/Salvar Anexo"]',
+    cssBySrc: 'input[type="image"][src*="gridvisualizaranexo"]',
     xpath: '//*[@id="page:frmre_consulta_anexos:ssBTOREAnexosGrid0"]/tbody/tr/td[2]/input',
+    xpathAbsolute: '/html/body/div[3]/div/form/div[6]/div[1]/div/table/tbody/tr/td[2]/input',
+    xpathByAlt: '//input[@type="image" and @alt="Abrir/Salvar Anexo"]',
+    xpathBySrc: '//input[@type="image" and contains(@src,"gridvisualizaranexo")]',
   },
   voltarButton: {
     id: 'page:frmre_consulta_anexos:re_btn_voltar',

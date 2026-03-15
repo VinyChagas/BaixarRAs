@@ -14,8 +14,78 @@ import { sleep } from '../utils/safeWait.js';
 import { safeExtractText } from '../utils/normalizeText.js';
 import { parsePaginationText } from '../utils/paginationUtils.js';
 
-const PAGINATION_WAIT_TIMEOUT = 25000;
-const PAGINATION_POLL_MS = 300;
+const PAGINATION_WAIT_TIMEOUT = 15000;
+const PAGINATION_POLL_MS = 80;
+const TIMELINE_POLL_MS = 250;
+const TIMELINE_ELEMENT_TIMEOUT_MS = 15000;
+
+/**
+ * Executa operação com implicit wait zerado (evita esperas longas de 5-30s)
+ */
+async function withImplicitZero(driver, operation) {
+  let originalImplicit = 5000;
+  try {
+    const t = await driver.manage().getTimeouts();
+    originalImplicit = t.implicit ?? 5000;
+    await driver.manage().setTimeouts({ implicit: 0 });
+  } catch {}
+  try {
+    return await operation();
+  } finally {
+    try {
+      await driver.manage().setTimeouts({ implicit: originalImplicit });
+    } catch {}
+  }
+}
+
+/**
+ * Aguarda elemento de paginação aparecer (polling 250ms)
+ */
+async function waitForPaginationElement(driver) {
+  const start = Date.now();
+  const xpaths = [
+    timelinePaginationSelectors.infoText.xpath,
+    timelinePaginationSelectors.infoText.xpathAbsolute,
+  ];
+  while (Date.now() - start < TIMELINE_ELEMENT_TIMEOUT_MS) {
+    for (const xpath of xpaths) {
+      try {
+        const els = await driver.findElements(By.xpath(xpath));
+        if (els.length > 0) return els[0];
+      } catch {
+        continue;
+      }
+    }
+    await sleep(TIMELINE_POLL_MS);
+  }
+  return null;
+}
+
+/**
+ * Aguarda botão da timeline aparecer (polling 250ms)
+ */
+async function findTimelineButtonWithPolling(driver, selectorObj) {
+  const start = Date.now();
+  const locators = [];
+  if (selectorObj.id) locators.push({ by: By.id, value: selectorObj.id });
+  if (selectorObj.css) locators.push({ by: By.css, value: selectorObj.css });
+  if (selectorObj.xpath) locators.push({ by: By.xpath, value: selectorObj.xpath });
+  if (selectorObj.xpathAbsolute) locators.push({ by: By.xpath, value: selectorObj.xpathAbsolute });
+  if (locators.length === 0) return null;
+
+  while (Date.now() - start < TIMELINE_ELEMENT_TIMEOUT_MS) {
+    for (const { by, value } of locators) {
+      try {
+        const els = await driver.findElements(by(value));
+        if (els.length > 0) return els[0];
+      } catch {
+        continue;
+      }
+    }
+    await sleep(TIMELINE_POLL_MS);
+  }
+  return null;
+}
 
 /**
  * Gera uniqueKey para deduplicação
@@ -57,28 +127,14 @@ export class AutbankTimelineCollector {
   }
 
   /**
-   * Lê o texto do elemento de paginação
+   * Lê o texto do elemento de paginação (usa polling 250ms, evita implicit wait)
    * Fonte oficial: "Página X de Y"
    */
   async getTimelinePaginationInfo() {
     await this.driver.switchToConsultaFrame();
-    await sleep(100);
 
     const driver = this.driver.getDriver();
-    const xpaths = [
-      timelinePaginationSelectors.infoText.xpath,
-      timelinePaginationSelectors.infoText.xpathAbsolute,
-    ];
-
-    let element;
-    for (const xpath of xpaths) {
-      try {
-        element = await driver.findElement(By.xpath(xpath));
-        break;
-      } catch {
-        continue;
-      }
-    }
+    const element = await waitForPaginationElement(driver);
 
     if (!element) {
       return { currentPage: 1, totalPages: 1, rawText: '' };
@@ -91,43 +147,38 @@ export class AutbankTimelineCollector {
 
   /**
    * Vai para a última página cronológica (início do atendimento)
-   * scroll_3last = início do chamado
+   * scroll_3last = início do chamado (polling 250ms)
    */
   async goToLastChronologicalPage() {
     logger.info('Indo para a última página cronológica...');
     await this.driver.switchToConsultaFrame();
-    await sleep(300);
 
-    const el = await this.driver.waitAndFind(timelineSelectors.buttonGoToStart);
-    await this.driver.getDriver().executeScript(
+    const driver = this.driver.getDriver();
+    const el = await findTimelineButtonWithPolling(driver, timelineSelectors.buttonGoToStart);
+    if (!el) throw new Error('Botão última página não encontrado');
+    await driver.executeScript(
       'arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',
       el
     );
-    await sleep(800);
   }
 
   /**
-   * Avança na sequência: da última página em direção à primeira
+   * Avança na sequência: da última página em direção à primeira (polling 250ms)
    * scroll_1previous = "avançar as páginas para acompanhar a sequencia da RA"
    */
   async goToPreviousInSequence() {
     await this.driver.switchToConsultaFrame();
-    await sleep(200);
 
-    try {
-      const el = await this.driver.waitAndFind(timelineSelectors.buttonPreviousPageAnchor);
-      await this.driver.getDriver().executeScript(
-        'arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',
-        el
-      );
-    } catch (e1) {
-      const img = await this.driver.waitAndFind(timelineSelectors.buttonPreviousPage);
-      await this.driver.getDriver().executeScript(
-        'arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',
-        img
-      );
+    const driver = this.driver.getDriver();
+    let el = await findTimelineButtonWithPolling(driver, timelineSelectors.buttonPreviousPageAnchor);
+    if (!el) {
+      el = await findTimelineButtonWithPolling(driver, timelineSelectors.buttonPreviousPage);
     }
-    await sleep(1000);
+    if (!el) throw new Error('Botão página anterior não encontrado');
+    await driver.executeScript(
+      'arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',
+      el
+    );
   }
 
   /**
@@ -149,26 +200,51 @@ export class AutbankTimelineCollector {
    * Navega até uma página específica de forma determinística
    * Nunca assume estado atual - sempre parte de ponto conhecido
    */
-  async goToTimelinePage(targetPage) {
+  /**
+   * Vai para a primeira página (mais recente) com um único clique (polling 250ms)
+   */
+  async goToFirstPage() {
     await this.driver.switchToConsultaFrame();
-    await sleep(200);
 
-    const info = await this.getTimelinePaginationInfo();
-    const totalPages = Math.max(1, info.totalPages);
+    const driver = this.driver.getDriver();
+    const el = await findTimelineButtonWithPolling(driver, timelineSelectors.buttonFirstPage);
+    if (!el) throw new Error('Botão primeira página não encontrado');
+    await driver.executeScript(
+      'arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',
+      el
+    );
+  }
 
-    if (targetPage >= totalPages) {
+  async goToTimelinePage(targetPage) {
+    const driver = this.driver.getDriver();
+    return withImplicitZero(driver, async () => {
+      await this.driver.switchToConsultaFrame();
+
+      const info = await this.getTimelinePaginationInfo();
+      const totalPages = Math.max(1, info.totalPages);
+
+      if (info.currentPage === targetPage) return;
+
+      if (targetPage === 1) {
+        await this.goToFirstPage();
+        await this.waitForTimelinePage(1);
+        return;
+      }
+
+      if (targetPage >= totalPages) {
+        await this.goToLastChronologicalPage();
+        await this.waitForTimelinePage(totalPages);
+        return;
+      }
+
       await this.goToLastChronologicalPage();
       await this.waitForTimelinePage(totalPages);
-      return;
-    }
 
-    await this.goToLastChronologicalPage();
-    await this.waitForTimelinePage(totalPages);
-
-    for (let p = totalPages - 1; p >= targetPage; p--) {
-      await this.goToPreviousInSequence();
-      await this.waitForTimelinePage(p);
-    }
+      for (let p = totalPages - 1; p >= targetPage; p--) {
+        await this.goToPreviousInSequence();
+        await this.waitForTimelinePage(p);
+      }
+    });
   }
 
   /**
@@ -226,55 +302,57 @@ export class AutbankTimelineCollector {
    * Ordem cronológica: da última página (início) até a primeira (mais recente)
    */
   async collectFullTimelineTextOnly() {
-    logger.info('Iniciando coleta textual completa da RA...');
-    this._partialHistory = [];
-    this._partialTotalPages = 1;
+    const driver = this.driver.getDriver();
+    return withImplicitZero(driver, async () => {
+      logger.info('Iniciando coleta textual completa da RA...');
+      this._partialHistory = [];
+      this._partialTotalPages = 1;
 
-    await this.driver.switchToConsultaFrame();
-    await sleep(300);
+      await this.driver.switchToConsultaFrame();
 
-    await this.goToLastChronologicalPage();
+      await this.goToLastChronologicalPage();
 
-    const info = await this.getTimelinePaginationInfo();
-    logger.info(`Paginação atual detectada: ${info.rawText || 'Página 1 de 1'}`);
+      const info = await this.getTimelinePaginationInfo();
+      logger.info(`Paginação atual detectada: ${info.rawText || 'Página 1 de 1'}`);
 
-    const totalPages = Math.max(1, info.totalPages);
-    this._partialTotalPages = totalPages;
-    const history = [];
-    const seenKeys = new Set();
+      const totalPages = Math.max(1, info.totalPages);
+      this._partialTotalPages = totalPages;
+      const history = [];
+      const seenKeys = new Set();
 
-    for (let page = totalPages; page >= 1; page--) {
-      const currentInfo = await this.getTimelinePaginationInfo();
-      if (currentInfo.currentPage !== page) {
-        throw new Error(`Esperado página ${page}, mas está em ${currentInfo.currentPage}`);
-      }
+      for (let page = totalPages; page >= 1; page--) {
+        const currentInfo = await this.getTimelinePaginationInfo();
+        if (currentInfo.currentPage !== page) {
+          throw new Error(`Esperado página ${page}, mas está em ${currentInfo.currentPage}`);
+        }
 
-      logger.info(`Coletando dados da página ${page} de ${totalPages}...`);
-      const rows = await this.collectCurrentTimelinePageRows(page);
+        logger.info(`Coletando dados da página ${page} de ${totalPages}...`);
+        const rows = await this.collectCurrentTimelinePageRows(page);
 
-      for (const row of rows) {
-        if (seenKeys.has(row.uniqueKey)) continue;
-        seenKeys.add(row.uniqueKey);
-        history.push(row);
-      }
+        for (const row of rows) {
+          if (seenKeys.has(row.uniqueKey)) continue;
+          seenKeys.add(row.uniqueKey);
+          history.push(row);
+        }
 
-      this._partialHistory = [...history];
-      logger.info(`Página ${page} coletada com ${rows.length} linhas.`);
+        this._partialHistory = [...history];
+        logger.info(`Página ${page} coletada com ${rows.length} linhas.`);
 
-      if (page > 1) {
-        const targetPage = page - 1;
-        try {
-          await this.goToPreviousInSequence();
-          await this.waitForTimelinePage(targetPage);
-        } catch (e) {
-          logger.warn(`Falha ao ir para página ${targetPage}:`, e.message);
-          throw e;
+        if (page > 1) {
+          const targetPage = page - 1;
+          try {
+            await this.goToPreviousInSequence();
+            await this.waitForTimelinePage(targetPage);
+          } catch (e) {
+            logger.warn(`Falha ao ir para página ${targetPage}:`, e.message);
+            throw e;
+          }
         }
       }
-    }
 
-    logger.info(`Histórico completo coletado: ${history.length} itens em ${totalPages} página(s)`);
-    return { history, totalPages };
+      logger.info(`Histórico completo coletado: ${history.length} itens em ${totalPages} página(s)`);
+      return { history, totalPages };
+    });
   }
 
   /**
@@ -326,20 +404,21 @@ export class AutbankTimelineCollector {
   }
 
   /**
-   * Abre a tela de anexos para a linha do item
-   * Usa locateRowInCurrentPage para encontrar a linha correta
+   * Abre a tela de anexos para a linha do item (polling 250ms, implicit 0)
    */
   async openAttachmentScreenForRow(item) {
-    const tr = await this.locateRowInCurrentPage(item);
-    if (!tr) {
-      throw new Error(`Linha não encontrada para item ${item.uniqueKey}`);
-    }
+    const driver = this.driver.getDriver();
+    return withImplicitZero(driver, async () => {
+      const tr = await this.locateRowInCurrentPage(item);
+      if (!tr) {
+        throw new Error(`Linha não encontrada para item ${item.uniqueKey}`);
+      }
 
-    const attachmentInput = await tr.findElement(By.css('td:nth-child(8) input[type="image"]'));
-    await this.driver.getDriver().executeScript(
-      'arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',
-      attachmentInput
-    );
-    await sleep(800);
+      const attachmentInput = await tr.findElement(By.css('td:nth-child(8) input[type="image"]'));
+      await driver.executeScript(
+        'arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',
+        attachmentInput
+      );
+    });
   }
 }

@@ -32,9 +32,7 @@ export class AutbankDetailsFlow {
   async clickSetaExpand() {
     logger.info('Clicando no botão Seta para expandir detalhes...');
     await this.driver.switchToConsultaFrame();
-    await sleep(300);
     await this.driver.waitAndClick(detailSelectors.setaButton);
-    await sleep(700);
     logger.info('Detalhes expandidos');
   }
 

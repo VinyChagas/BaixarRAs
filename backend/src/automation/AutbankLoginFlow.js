@@ -57,7 +57,6 @@ export class AutbankLoginFlow {
   async openPortalFromLink(landingUrl, portalLinkSelector) {
     logger.info('Acessando portal...');
     await this.driver.navigate(landingUrl);
-    await sleep(1500);
 
     logger.info('Capturando janelas atuais antes do clique');
     const oldHandles = await this.driver.getWindowHandles();
@@ -120,11 +119,9 @@ export class AutbankLoginFlow {
    */
   async performLogin(email, password) {
     await this.driver.waitAndType(loginSelectors.userField, email);
-    await sleep(300);
+
     await this.driver.waitAndType(loginSelectors.passwordField, password);
-    await sleep(300);
     await this.driver.waitAndClick(loginSelectors.loginButton);
-    await sleep(3000);
   }
 
   /**

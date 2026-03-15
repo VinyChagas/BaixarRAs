@@ -20,7 +20,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 500;
+const RETRY_DELAY_MS = 150;
 
 export class AutbankDriver {
   constructor(config) {
@@ -60,7 +60,9 @@ export class AutbankDriver {
       }
     }
 
-    const builder = new Builder().forBrowser(this.config.browser);
+    const builder = new Builder()
+      .forBrowser(this.config.browser)
+      .setCapability('pageLoadStrategy', 'eager');
     if (isEdge) {
       builder.setEdgeOptions(options);
     } else {
@@ -108,7 +110,6 @@ export class AutbankDriver {
         } catch (e) {
           lastError = e;
           if (attempt < MAX_RETRIES || i < locators.length - 1) {
-            await sleep(RETRY_DELAY_MS);
           }
         }
       }
@@ -226,7 +227,6 @@ export class AutbankDriver {
 
     logger.info('Navegando para o portal...');
     await this.navigate(url);
-    await sleep(1500);
 
     const newWindowOpened = await waitForNewWindowOptional(
       this.driver,

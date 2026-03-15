@@ -34,12 +34,9 @@ export async function clearInputSafely(driver, selectorObj, timeout = 15000) {
   logger.info('Limpando campo Período de abertura...');
 
   await element.click();
-  await sleep(200);
 
   await element.sendKeys('\u0001'); // CTRL+A
-  await sleep(100);
   await element.sendKeys('\u0008'); // BACKSPACE
-  await sleep(100);
 
   let value = await element.getAttribute('value');
   if (value && value.trim() !== '') {
@@ -52,7 +49,6 @@ export async function clearInputSafely(driver, selectorObj, timeout = 15000) {
     `,
       element
     );
-    await sleep(200);
   }
 
   value = await element.getAttribute('value');
@@ -92,11 +88,9 @@ export async function clickSearchButton(driver, timeout = 15000) {
 
   logger.info('Clicando no botão Pesquisar...');
 
-  await sleep(500);
 
   try {
     await driver.executeScript('arguments[0].scrollIntoView({block: "center"});', element);
-    await sleep(300);
   } catch {}
 
   try {
@@ -124,7 +118,6 @@ export async function waitForSearchResults(driver, timeout = 15000) {
   for (const { by, value } of locators) {
     try {
       await driver.wait(until.elementLocated(by(value)), timeout);
-      await sleep(2000);
       return true;
     } catch {
       continue;
