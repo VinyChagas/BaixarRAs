@@ -1,0 +1,103 @@
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0 0.5rem;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: var(--text-primary);
+}
+
+.modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.detail-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.detail-sections section h3 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.375rem;
+}
+
+.detail-sections section p {
+  font-size: 0.9375rem;
+}
+
+.detail-sections .description {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.extra-fields {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.extra-fields div {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 0.75rem;
+}
+
+.extra-fields dt {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.extra-fields dd {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.detail-error .error-message {
+  color: var(--error);
+}

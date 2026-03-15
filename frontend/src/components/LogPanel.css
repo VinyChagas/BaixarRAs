@@ -1,0 +1,59 @@
+.log-panel {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.log-panel h3 {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.log-content {
+  padding: 1rem;
+  max-height: 200px;
+  overflow-y: auto;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.8125rem;
+}
+
+.log-empty {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.log-entry {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid transparent;
+}
+
+.log-entry:last-child {
+  border-bottom: none;
+}
+
+.log-time {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.log-message {
+  word-break: break-word;
+}
+
+.log-entry.log-success .log-message {
+  color: var(--success);
+}
+
+.log-entry.log-error .log-message {
+  color: var(--error);
+}
+
+.log-entry.log-info .log-message {
+  color: var(--accent);
+}

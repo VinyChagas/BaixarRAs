@@ -1,0 +1,18 @@
+{
+  "auth_test": {
+    "url": "POST /api/auth/test",
+    "body": {
+      "headless": false
+    }
+  },
+  "ra_search": {
+    "url": "POST /api/ra/search",
+    "body": {
+      "ras": ["10530", "10531", "10532"],
+      "headless": false
+    }
+  },
+  "health": {
+    "url": "GET /api/health"
+  }
+}

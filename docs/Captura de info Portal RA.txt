@@ -1,0 +1,128 @@
+Botão para ir para o inicio do chamado:
+
+<img src="../img/imgultimo.gif" border="0">
+
+//*[@id="page:frmre_consseqra_contato_r:ssBTORESequenciaRA0:ssBTORESequenciaRA0_scroll_3last"]/img
+
+/html/body/div[3]/div/form/div[3]/div/table/thead/tr[1]/th/span/table/tbody/tr/td[3]/table/tbody/tr/td[2]/a/img
+
+document.querySelector("#page\\:frmre_consseqra_contato_r\\:ssBTORESequenciaRA0\\:ssBTORESequenciaRA0_scroll_3last > img")
+
+
+Botão de avançar as páginas para acompanhar a sequencia da RA
+
+//*[@id="page:frmre_consseqra_contato_r:ssBTORESequenciaRA0:ssBTORESequenciaRA0_scroll_1previous"]/img
+
+/html/body/div[3]/div/form/div[3]/div/table/thead/tr[1]/th/span/table/tbody/tr/td[1]/table/tbody/tr/td[2]/a/img
+
+#page\:frmre_consseqra_contato_r\:ssBTORESequenciaRA0\:ssBTORESequenciaRA0_scroll_1previous > img
+
+
+Botão de Anexo:
+
+//*[@id="page:frmre_consseqra_contato_r:ssBTORESequenciaRA0"]/tbody/tr[7]/td[8]/input
+
+/html/body/div[3]/div/form/div[3]/div/table/tbody/tr[7]/td[8]/input
+
+#page\:frmre_consseqra_contato_r\:ssBTORESequenciaRA0 > tbody > tr:nth-child(7) > td:nth-child(8) > input[type=image]
+
+depois que clicar no botão de anexo os botões para baixar:
+
+/html/body/div[3]/div/form/div[6]/div[1]/div/table/tbody/tr/td[2]/input
+
+//*[@id="page:frmre_consulta_anexos:ssBTOREAnexosGrid0"]/tbody/tr/td[2]/input
+
+Obs.: Lembrando que pode ter vários arquivos para baixar, então ele deve baixar todos, depois de baixar ele deve interagir com o botão "Voltar":
+
+//*[@id="page:frmre_consulta_anexos:re_btn_voltar"]/input
+
+/html/body/div[3]/div/form/div[6]/div[2]/input
+
+o único ponto é que quando clicamos em voltar ele volta para a primeira tela, o que podemos chamar de página 1, que trás as atualizações mais recentes, então se por um acaso, tiver 4 páginas e eu estiver na terceira e clico para baixar um anexo, depois de clicar em "Voltar", ele vai voltar para página 1, o que pode acabar estragando o fluxo da automação, então de alguma maneira precisa registrar a quantidade de anexo que tem nesse chamado, e conseguir fazer uma contagem para conseguir baixar todos. 
+
+E por fim mais não menos importante, tem um botão para conseguir identificar mais detalhes do chamado, que vamos chamar de "Seta": 
+
+//*[@id="page:frmre_consseqra_contato_r:re_btntoggler_consseqra_contato_r"]/input
+
+/html/body/div[3]/div/form/div[4]/input
+
+Onde vai ter as seguintes informações:
+
+Numero do RA = //*[@id="page:frmre_consseqra_contato_r:numerora"]
+/html/body/div[3]/div/form/div[5]/div[17]/input
+
+Sistema Original = //*[@id="page:frmre_consseqra_contato_r:descsistema"]
+/html/body/div[3]/div/form/div[5]/div[13]/input
+
+Sistema Atual = //*[@id="page:frmre_consseqra_contato_r:sistemaatu"]
+/html/body/div[3]/div/form/div[5]/div[15]/input
+
+Versão = //*[@id="page:frmre_consseqra_contato_r:versaosistema"]
+/html/body/div[3]/div/form/div[5]/div[11]/input
+
+Data Abertura = //*[@id="page:frmre_consseqra_contato_r:dataabertura"]
+/html/body/div[3]/div/form/div[5]/div[1]/div[1]/input
+
+Ambiente = //*[@id="page:frmre_consseqra_contato_r:prioridadeambientelabel"]
+/html/body/div[3]/div/form/div[5]/div[5]/input
+
+Assunto = //*[@id="page:frmre_consseqra_contato_r:motivo"]
+/html/body/div[3]/div/form/div[5]/div[8]/div[1]/input
+
+Item do menu = //*[@id="page:frmre_consseqra_contato_r:item"]
+/html/body/div[3]/div/form/div[5]/div[7]/div[1]/input
+
+Contato = //*[@id="page:frmre_consseqra_contato_r:contatoinicial"]
+/html/body/div[3]/div/form/div[5]/div[10]/div[1]/div[1]/input
+
+Situação = //*[@id="page:frmre_consseqra_contato_r:situacaolabel"]
+/html/body/div[3]/div/form/div[5]/div[9]/div[2]/div[1]/input
+
+Atendente = //*[@id="page:frmre_consseqra_contato_r:nomeanalistaresponsavel"]
+/html/body/div[3]/div/form/div[5]/div[9]/div[1]/div[1]/input
+
+Lembrando que essas informações só vai conseguir ser selecionado depois de interagir com o botão de "Seta"
+
+Na medida que ele baixa as informações ele deve criar uma pasta com o numero da RA, e dentro ele deverá conter em forma de Json todas as informações de coleta da página que são:
+
+Data/Hora = //*[@id="page:frmre_consseqra_contato_r:ssBTORESequenciaRA0"]/thead/tr[2]/th[1]/span
+/html/body/div[3]/div/form/div[3]/div/table/thead/tr[2]/th[1]/span
+
+Sistema = //*[@id="page:frmre_consseqra_contato_r:ssBTORESequenciaRA0"]/thead/tr[2]/th[2]/span
+/html/body/div[3]/div/form/div[3]/div/table/thead/tr[2]/th[2]/span
+
+Analista/Contato = //*[@id="page:frmre_consseqra_contato_r:ssBTORESequenciaRA0"]/thead/tr[2]/th[3]/span
+/html/body/div[3]/div/form/div[3]/div/table/thead/tr[2]/th[3]/span
+
+Situação = //*[@id="page:frmre_consseqra_contato_r:ssBTORESequenciaRA0"]/thead/tr[2]/th[4]/span
+/html/body/div[3]/div/form/div[3]/div/table/thead/tr[2]/th[4]/span
+
+Tipo de Sequencia = //*[@id="page:frmre_consseqra_contato_r:ssBTORESequenciaRA0"]/thead/tr[2]/th[5]/span
+/html/body/div[3]/div/form/div[3]/div/table/thead/tr[2]/th[5]/span
+
+Descrição = //*[@id="page:frmre_consseqra_contato_r:ssBTORESequenciaRA0"]/thead/tr[2]/th[6]/span
+/html/body/div[3]/div/form/div[3]/div/table/thead/tr[2]/th[6]/span
+
+
+Coloquei acima os elementos para interagir com os cabeçalhos.
+
+Para continuar agora registrando as informações do que eu preciso
+
+Data/Hora = //*[@id="page:frmre_consseqra_contato_r:ssBTORESequenciaRA0"]/tbody/tr[1]/td[1]/span
+/html/body/div[3]/div/form/div[3]/div/table/tbody/tr[1]/td[1]/span
+
+Sistema = //*[@id="page:frmre_consseqra_contato_r:ssBTORESequenciaRA0"]/tbody/tr[1]/td[2]/span
+/html/body/div[3]/div/form/div[3]/div/table/tbody/tr[1]/td[2]/span
+
+Analista/Contato = //*[@id="page:frmre_consseqra_contato_r:ssBTORESequenciaRA0"]/tbody/tr[1]/td[3]/span
+/html/body/div[3]/div/form/div[3]/div/table/tbody/tr[1]/td[3]/span
+
+Situação = //*[@id="page:frmre_consseqra_contato_r:ssBTORESequenciaRA0"]/tbody/tr[1]/td[4]/span
+/html/body/div[3]/div/form/div[3]/div/table/tbody/tr[1]/td[4]/span
+
+Tipo de Sequencia = //*[@id="page:frmre_consseqra_contato_r:ssBTORESequenciaRA0"]/tbody/tr[1]/td[5]/span
+/html/body/div[3]/div/form/div[3]/div/table/tbody/tr[1]/td[5]/span
+
+Descrição = //*[@id="page:frmre_consseqra_contato_r:ssBTORESequenciaRA0"]/tbody/tr[1]/td[6]/span
+/html/body/div[3]/div/form/div[3]/div/table/tbody/tr[1]/td[6]/span
+
