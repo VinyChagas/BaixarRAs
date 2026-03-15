@@ -1,20 +1,35 @@
 /**
  * Download de anexos da RA
- * ETAPA 2: Executada APÓS o histórico estar salvo
+ * FASE 3: Download dos anexos agrupados por página
+ * Regra: botão Voltar sempre retorna para página 1 - sempre reposicionar explicitamente
  */
 
 import path from 'path';
-import fs from 'fs';
 import { By } from 'selenium-webdriver';
 import { logger } from '../utils/logger.js';
-import { attachmentSelectors } from './selectors/autbankSelectors.js';
-import { sleep } from '../utils/safeWait.js';
 import {
   ensureDirectoryExists,
   waitForDownloadToFinish,
   listNewFilesSince,
   moveDownloadedFileIfNeeded,
+  sanitizeFileName,
 } from '../utils/fileUtils.js';
+import { updateHistoryItemWithDownloadedFiles } from './timelineStorage.js';
+
+const VOLTAR_SELECTORS = [
+  { xpath: '/html/body/div[3]/div/form/div[6]/div[2]/input' },
+  { xpath: '//*[@id="page:frmre_consulta_anexos:re_btn_voltar"]/input' },
+  { css: '#page\\:frmre_consulta_anexos\\:re_btn_voltar > input' },
+  { css: '#page\\:frmre_consulta_anexos\\:re_btn_voltar input' },
+  { xpath: '//input[@type="image" and contains(@src,"cmdvoltar")]' },
+  { id: 'page:frmre_consulta_anexos:re_btn_voltar' },
+];
+
+const DOWNLOAD_BUTTON_SELECTORS = [
+  { xpath: '//*[@id="page:frmre_consulta_anexos:ssBTOREAnexosGrid0"]/tbody/tr/td[2]/input' },
+  { xpath: '/html/body/div[3]/div/form/div[6]/div[1]/div/table/tbody/tr/td[2]/input' },
+  { css: '#page\\:frmre_consulta_anexos\\:ssBTOREAnexosGrid0 tbody tr td:nth-child(2) input' },
+];
 
 export class AutbankAttachmentDownloader {
   constructor(driver, anexosDir) {
@@ -22,47 +37,30 @@ export class AutbankAttachmentDownloader {
     this.anexosDir = anexosDir;
   }
 
-  /**
-   * Configura o diretório de download
-   */
   async prepareDownloadDir() {
     ensureDirectoryExists(this.anexosDir);
     await this.driver.setDownloadPath(this.anexosDir);
   }
 
   /**
-   * Clica em Voltar na tela de anexos (retorna para timeline)
-   * Tenta múltiplos seletores e contextos (frame + main content).
+   * Clica em Voltar na tela de anexos
+   * Portal SEMPRE retorna para página 1 - não confiar no estado da interface
    */
   async returnFromAttachmentScreen() {
-    logger.info('Clicando em Voltar...');
-    await sleep(300);
-
-    const voltarSelectors = [
-      { xpath: '/html/body/div[3]/div/form/div[6]/div[2]/input' },
-      { xpath: '//*[@id="page:frmre_consulta_anexos:re_btn_voltar"]/input' },
-      { css: '#page\\:frmre_consulta_anexos\\:re_btn_voltar > input' },
-      { css: '#page\\:frmre_consulta_anexos\\:re_btn_voltar input' },
-      { xpath: '//input[@type="image" and contains(@src,"cmdvoltar")]' },
-      { xpath: '//input[contains(@name,"frmre_consulta_anexos") and contains(@src,"cmdvoltar")]' },
-      { id: 'page:frmre_consulta_anexos:re_btn_voltar' },
-    ];
+    logger.info('Voltando da tela de anexos...');
 
     const findAndClickVoltar = async () => {
       const driver = this.driver.getDriver();
-      for (const sel of voltarSelectors) {
+      for (const sel of VOLTAR_SELECTORS) {
         try {
           const by = sel.xpath ? By.xpath(sel.xpath) : sel.css ? By.css(sel.css) : By.id(sel.id);
           const el = await driver.findElement(by);
-          if (el) {
-            await driver.executeScript(
-              'arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',
-              el
-            );
-            logger.info('Botão Voltar clicado com sucesso.');
-            return true;
-          }
-        } catch (e) {
+          await driver.executeScript(
+            'arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',
+            el
+          );
+          return true;
+        } catch {
           continue;
         }
       }
@@ -70,28 +68,26 @@ export class AutbankAttachmentDownloader {
     };
 
     const contexts = [
-      { name: 'main content', fn: () => this.driver.switchToMainContent() },
-      { name: 'frame consulta', fn: () => this.driver.switchToConsultaFrame() },
+      () => this.driver.switchToMainContent(),
+      () => this.driver.switchToConsultaFrame(),
     ];
 
     let clicked = false;
-    for (const ctx of contexts) {
+    for (const switchCtx of contexts) {
       try {
-        await ctx.fn();
-        await sleep(300);
+        await switchCtx();
         clicked = await findAndClickVoltar();
         if (clicked) break;
       } catch (e) {
-        logger.warn(`Voltar em ${ctx.name} falhou:`, e.message);
+        logger.warn('Voltar falhou neste contexto:', e.message);
       }
     }
 
     if (!clicked) {
-      logger.warn('Tentando novamente após breve espera...');
-      await sleep(600);
-      for (const ctx of contexts) {
+      logger.warn('Tentando novamente...');
+      for (const switchCtx of contexts) {
         try {
-          await ctx.fn();
+          await switchCtx();
           clicked = await findAndClickVoltar();
           if (clicked) break;
         } catch {}
@@ -99,48 +95,55 @@ export class AutbankAttachmentDownloader {
     }
 
     if (!clicked) {
-      logger.warn('Não foi possível clicar em Voltar após todas as tentativas.');
+      logger.warn('Não foi possível clicar em Voltar.');
     }
-
-    await sleep(1000);
   }
 
   /**
-   * Baixa todos os arquivos da tela de anexos atual.
-   * Os arquivos vão para anexosDir (via CDP) ou para outputDir (Chrome prefs).
-   * Se caírem em outputDir, move para anexosDir.
+   * Baixa todos os arquivos da tela de anexos atual
+   * Retorna lista de caminhos relativos (ex: ["anexos/arquivo.pdf"])
    */
-  async downloadAllFilesFromAttachmentScreen() {
+  async downloadAllAttachmentsInScreen(item) {
     const driver = this.driver.getDriver();
     const downloaded = [];
     const outputDir = path.dirname(path.dirname(this.anexosDir));
 
     try {
-      const buttons = await driver.findElements(
-        By.css('#page\\:frmre_consulta_anexos\\:ssBTOREAnexosGrid0 tbody tr td:nth-child(2) input')
-      );
+      await this.driver.switchToConsultaFrame();
+
+      let buttons = [];
+      for (const sel of DOWNLOAD_BUTTON_SELECTORS) {
+        const by = sel.xpath ? By.xpath(sel.xpath) : By.css(sel.css);
+        buttons = await driver.findElements(by);
+        if (buttons.length > 0) break;
+      }
+
+      if (buttons.length === 0) {
+        logger.info('Nenhum botão de download encontrado na tela.');
+        return [];
+      }
+
+      logger.info(`Baixando ${buttons.length} arquivo(s)...`);
 
       for (let i = 0; i < buttons.length; i++) {
         const beforeTime = Date.now();
         await this.driver.setDownloadPath(this.anexosDir);
         await buttons[i].click();
-        await sleep(800);
 
-        await waitForDownloadToFinish([outputDir, this.anexosDir], 30000);
+        await waitForDownloadToFinish([outputDir, this.anexosDir], 25000);
 
-        let newFiles = listNewFilesSince(this.anexosDir, beforeTime - 1000);
+        let newFiles = listNewFilesSince(this.anexosDir, beforeTime - 500);
         if (newFiles.length === 0) {
-          const filesInOutput = listNewFilesSince(outputDir, beforeTime - 1000);
+          const filesInOutput = listNewFilesSince(outputDir, beforeTime - 500);
           for (const { path: srcPath, name } of filesInOutput) {
             moveDownloadedFileIfNeeded(srcPath, this.anexosDir, name);
           }
-          newFiles = listNewFilesSince(this.anexosDir, beforeTime - 1000);
+          newFiles = listNewFilesSince(this.anexosDir, beforeTime - 500);
         }
 
         for (const { name } of newFiles) {
           downloaded.push(`anexos/${name}`);
         }
-        await sleep(300);
       }
     } catch (e) {
       logger.warn('Erro ao baixar anexos:', e.message);
@@ -150,42 +153,47 @@ export class AutbankAttachmentDownloader {
   }
 
   /**
-   * Abre o painel de anexos da linha (página atual deve estar correta)
+   * FASE 3: Processa anexos agrupados por página
+   * Para cada página: reposicionar -> abrir cada item -> baixar -> voltar -> aceitar página 1
    */
-  async openAttachmentByRow(rowIndex) {
-    const selector = `#page\\:frmre_consseqra_contato_r\\:ssBTORESequenciaRA0 tbody tr:nth-child(${rowIndex}) td:nth-child(8) input`;
-    await this.driver.waitAndClick({ css: selector });
-    await sleep(1000);
-  }
+  async processAttachmentGroupsByPage(groups, pageNumbers, timelineCollector) {
+    logger.info('Processando anexos agrupados por página...');
 
-  /**
-   * ETAPA 2: Percorre itens com anexo e baixa todos
-   */
-  async downloadAttachmentsFromCollectedTimeline(historyItems, timelineCollector) {
-    logger.info('Iniciando segunda passada para download de anexos...');
+    for (const pageNum of pageNumbers) {
+      const items = groups[pageNum] || [];
+      if (items.length === 0) continue;
 
-    for (const item of historyItems) {
-      try {
-        logger.info(`Reposicionando para página ${item.pageNumber}, linha ${item.rowIndex}...`);
-        await timelineCollector.goToTimelinePage(item.pageNumber);
-        await sleep(400);
+      logger.info(`Processando anexos da página ${pageNum}...`);
 
-        logger.info(`Baixando anexos do item uniqueKey ${item.uniqueKey}...`);
-        await timelineCollector.openAttachmentByRow(item.rowIndex);
-        const baixados = await this.downloadAllFilesFromAttachmentScreen();
-        item.anexosBaixados = baixados;
-
-        logger.info('Download concluído.');
-        await this.returnFromAttachmentScreen();
-        await sleep(800);
-      } catch (e) {
-        logger.warn(`Erro ao baixar anexos do item ${item.uniqueKey}:`, e.message);
+      for (const item of items) {
         try {
-          await this.driver.takeErrorScreenshot(`anexo_${item.uniqueKey}`);
-        } catch {}
-        await this.returnFromAttachmentScreen().catch(() => {});
-        await sleep(500);
+          logger.info(`Reposicionando para página ${pageNum}...`);
+          await timelineCollector.goToTimelinePage(pageNum);
+
+          logger.info(`Abrindo anexos da linha ${item.rowIndex} (${item.uniqueKey})...`);
+          await timelineCollector.openAttachmentScreenForRow(item);
+
+          const files = await this.downloadAllAttachmentsInScreen(item);
+          updateHistoryItemWithDownloadedFiles(item, files);
+
+          logger.info('Voltando da tela de anexos...');
+          await this.returnFromAttachmentScreen();
+
+          logger.info('Portal retornou para página 1. Reposicionando...');
+        } catch (e) {
+          logger.warn(`Erro ao baixar anexos do item ${item.uniqueKey}:`, e.message);
+          try {
+            await this.driver.takeErrorScreenshot(`anexo_${sanitizeFileName(item.uniqueKey || 'item')}`);
+          } catch {}
+          try {
+            await this.returnFromAttachmentScreen();
+          } catch {}
+        }
       }
+
+      logger.info(`Página ${pageNum} finalizada.`);
     }
+
+    logger.info('Download de anexos concluído.');
   }
 }

@@ -7,6 +7,17 @@ import path from 'path';
 import { logger } from '../utils/logger.js';
 
 /**
+ * Atualiza o item do histórico com os arquivos baixados
+ * @param {Object} item - Item do histórico (referência)
+ * @param {string[]} files - Lista de caminhos relativos dos arquivos (ex: ["anexos/arquivo.pdf"])
+ */
+export function updateHistoryItemWithDownloadedFiles(item, files) {
+  if (!item) return;
+  item.anexosBaixados = item.anexosBaixados || [];
+  item.anexosBaixados.push(...(files || []));
+}
+
+/**
  * Salva o histórico em JSON
  */
 export function saveTimelineJson(ra, history, totalPages, raDir) {
@@ -50,6 +61,8 @@ export function saveTimelineTxt(ra, history, raDir) {
     lines.push(`Tipo Sequência: ${item.tipoSequencia || '-'}`);
     lines.push(`Descrição: ${item.descricao || '-'}`);
     lines.push(`Possui anexo: ${item.possuiAnexo ? 'Sim' : 'Não'}`);
+    const anexos = item.anexosBaixados || [];
+    lines.push(`Anexos baixados: ${anexos.length > 0 ? anexos.join(', ') : '-'}`);
     lines.push('');
   }
 

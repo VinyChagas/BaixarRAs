@@ -2,6 +2,12 @@
 
 Sistema full stack para coleta completa de dados de atendimento (RAs) no portal da Autbank, com foco em migração futura para ServiceNow.
 
+## Documentação do Fluxo
+
+Para detalhes completos da automação (login, pesquisa, coleta, anexos, paginação), consulte:
+
+**[docs/FLUXO_AUTOMACAO.md](docs/FLUXO_AUTOMACAO.md)**
+
 ## Estrutura do Projeto
 
 ```

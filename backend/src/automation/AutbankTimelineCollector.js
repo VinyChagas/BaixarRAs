@@ -1,7 +1,7 @@
 /**
  * Coletor do histórico completo da RA (timeline)
- * ETAPA 1: Apenas scraping textual - NÃO clica em anexos
- * ETAPA 2: Download de anexos (função separada)
+ * FASE 1: Apenas scraping textual - NÃO clica em anexos
+ * FASE 3: Navegação e localização de linhas para download de anexos
  */
 
 import { By } from 'selenium-webdriver';
@@ -26,6 +26,24 @@ function buildUniqueKey(pageNumber, rowIndex, dataHora, tipoSequencia) {
     .substring(0, 100);
 }
 
+/**
+ * Normaliza texto para comparação (trim, lowercase, remove espaços extras)
+ */
+function normalizeForCompare(text) {
+  return (text || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/**
+ * Verifica se dois textos são equivalentes para matching
+ */
+function textsMatch(a, b) {
+  const na = normalizeForCompare(a);
+  const nb = normalizeForCompare(b);
+  if (!na && !nb) return true;
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
 export class AutbankTimelineCollector {
   constructor(driver) {
     this.driver = driver;
@@ -33,9 +51,6 @@ export class AutbankTimelineCollector {
     this._partialTotalPages = 1;
   }
 
-  /**
-   * Retorna o histórico parcial coletado até o momento (para salvar em caso de erro)
-   */
   getPartialHistory() {
     if (!this._partialHistory || this._partialHistory.length === 0) return null;
     return { history: this._partialHistory, totalPages: this._partialTotalPages };
@@ -43,6 +58,7 @@ export class AutbankTimelineCollector {
 
   /**
    * Lê o texto do elemento de paginação
+   * Fonte oficial: "Página X de Y"
    */
   async getTimelinePaginationInfo() {
     await this.driver.switchToConsultaFrame();
@@ -74,54 +90,44 @@ export class AutbankTimelineCollector {
   }
 
   /**
-   * Vai para a ÚLTIMA página do histórico (início do chamado).
-   * Obrigatório antes de coletar: scroll_3last leva ao início da sequência.
+   * Vai para a última página cronológica (início do atendimento)
+   * scroll_3last = início do chamado
    */
-  async goToLastPage() {
-    logger.info('Indo para a última página do histórico (início do chamado)...');
+  async goToLastChronologicalPage() {
+    logger.info('Indo para a última página cronológica...');
     await this.driver.switchToConsultaFrame();
     await sleep(300);
 
-    const tryClick = async () => {
-      const el = await this.driver.waitAndFind(timelineSelectors.buttonGoToStart);
-      await this.driver.getDriver().executeScript(
-        'arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',
-        el
-      );
-    };
-
-    await tryClick();
-    await sleep(1000);
+    const el = await this.driver.waitAndFind(timelineSelectors.buttonGoToStart);
+    await this.driver.getDriver().executeScript(
+      'arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',
+      el
+    );
+    await sleep(800);
   }
 
   /**
-   * Avança na sequência: da última página em direção à primeira.
-   * scroll_1previous = "avançar as páginas para acompanhar a sequencia da RA".
-   * Ex: da página 2 vai para página 1.
+   * Avança na sequência: da última página em direção à primeira
+   * scroll_1previous = "avançar as páginas para acompanhar a sequencia da RA"
    */
   async goToPreviousInSequence() {
     await this.driver.switchToConsultaFrame();
     await sleep(200);
 
-    const tryClick = async () => {
-      try {
-        const el = await this.driver.waitAndFind(timelineSelectors.buttonPreviousPageAnchor);
-        await this.driver.getDriver().executeScript(
-          'arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',
-          el
-        );
-      } catch (e1) {
-        logger.info('Clique no anchor falhou, tentando img:', e1.message);
-        const img = await this.driver.waitAndFind(timelineSelectors.buttonPreviousPage);
-        await this.driver.getDriver().executeScript(
-          'arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',
-          img
-        );
-      }
-    };
-
-    await tryClick();
-    await sleep(1200);
+    try {
+      const el = await this.driver.waitAndFind(timelineSelectors.buttonPreviousPageAnchor);
+      await this.driver.getDriver().executeScript(
+        'arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',
+        el
+      );
+    } catch (e1) {
+      const img = await this.driver.waitAndFind(timelineSelectors.buttonPreviousPage);
+      await this.driver.getDriver().executeScript(
+        'arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',
+        img
+      );
+    }
+    await sleep(1000);
   }
 
   /**
@@ -140,23 +146,23 @@ export class AutbankTimelineCollector {
   }
 
   /**
-   * Navega até uma página específica (para ETAPA 2 - download de anexos).
-   * Fluxo: ir para última página, depois scroll_1previous até a página desejada.
+   * Navega até uma página específica de forma determinística
+   * Nunca assume estado atual - sempre parte de ponto conhecido
    */
   async goToTimelinePage(targetPage) {
     await this.driver.switchToConsultaFrame();
     await sleep(200);
 
-    let info = await this.getTimelinePaginationInfo();
+    const info = await this.getTimelinePaginationInfo();
     const totalPages = Math.max(1, info.totalPages);
 
     if (targetPage >= totalPages) {
-      await this.goToLastPage();
+      await this.goToLastChronologicalPage();
       await this.waitForTimelinePage(totalPages);
       return;
     }
 
-    await this.goToLastPage();
+    await this.goToLastChronologicalPage();
     await this.waitForTimelinePage(totalPages);
 
     for (let p = totalPages - 1; p >= targetPage; p--) {
@@ -216,23 +222,20 @@ export class AutbankTimelineCollector {
   }
 
   /**
-   * ETAPA 1: Coleta completa do histórico - APENAS texto, sem clicar em anexos
-   * Fluxo obrigatório:
-   * 1. Ir para a ÚLTIMA página (scroll_3last) = início do chamado
-   * 2. Contar páginas e coletar da página atual
-   * 3. Usar scroll_1previous para avançar na sequência (última -> primeira)
+   * FASE 1: Coleta completa do histórico - APENAS texto
+   * Ordem cronológica: da última página (início) até a primeira (mais recente)
    */
   async collectFullTimelineTextOnly() {
-    logger.info('Iniciando coleta textual completa do histórico...');
+    logger.info('Iniciando coleta textual completa da RA...');
     this._partialHistory = [];
     this._partialTotalPages = 1;
 
     await this.driver.switchToConsultaFrame();
     await sleep(300);
 
-    await this.goToLastPage();
+    await this.goToLastChronologicalPage();
 
-    let info = await this.getTimelinePaginationInfo();
+    const info = await this.getTimelinePaginationInfo();
     logger.info(`Paginação atual detectada: ${info.rawText || 'Página 1 de 1'}`);
 
     const totalPages = Math.max(1, info.totalPages);
@@ -256,23 +259,16 @@ export class AutbankTimelineCollector {
       }
 
       this._partialHistory = [...history];
-
       logger.info(`Página ${page} coletada com ${rows.length} linhas.`);
 
       if (page > 1) {
         const targetPage = page - 1;
-        const maxRetries = 2;
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          try {
-            logger.info(`Avançando para página ${targetPage} (tentativa ${attempt}/${maxRetries})...`);
-            await this.goToPreviousInSequence();
-            await this.waitForTimelinePage(targetPage);
-            break;
-          } catch (e) {
-            if (attempt === maxRetries) throw e;
-            logger.warn(`Falha ao ir para página ${targetPage}, tentando novamente:`, e.message);
-            await sleep(1000);
-          }
+        try {
+          await this.goToPreviousInSequence();
+          await this.waitForTimelinePage(targetPage);
+        } catch (e) {
+          logger.warn(`Falha ao ir para página ${targetPage}:`, e.message);
+          throw e;
         }
       }
     }
@@ -282,11 +278,68 @@ export class AutbankTimelineCollector {
   }
 
   /**
-   * Abre o painel de anexos da linha (para ETAPA 2)
+   * Localiza a linha na página atual que corresponde ao item
+   * Valida por rowIndex e campos textuais
    */
-  async openAttachmentByRow(rowIndex) {
-    const selector = `#page\\:frmre_consseqra_contato_r\\:ssBTORESequenciaRA0 tbody tr:nth-child(${rowIndex}) td:nth-child(8) input`;
-    await this.driver.waitAndClick({ css: selector });
-    await sleep(1000);
+  async locateRowInCurrentPage(item) {
+    const driver = this.driver.getDriver();
+    const trs = await driver.findElements(By.css(timelineSelectors.rows.css));
+
+    const tryByIndex = async () => {
+      const idx = (item.rowIndex || 1) - 1;
+      if (idx >= 0 && idx < trs.length) {
+        const tr = trs[idx];
+        const cells = await tr.findElements(By.css('td'));
+        if (cells.length >= 6) {
+          const dataHora = await safeExtractText(cells[0]);
+          const tipoSequencia = await safeExtractText(cells[4]);
+          if (textsMatch(dataHora, item.dataHora) && textsMatch(tipoSequencia, item.tipoSequencia)) {
+            return tr;
+          }
+        }
+      }
+      return null;
+    };
+
+    let tr = await tryByIndex();
+    if (tr) return tr;
+
+    for (let i = 0; i < trs.length; i++) {
+      const cells = await trs[i].findElements(By.css('td'));
+      if (cells.length < 6) continue;
+
+      const dataHora = await safeExtractText(cells[0]);
+      const analistaContato = await safeExtractText(cells[2]);
+      const tipoSequencia = await safeExtractText(cells[4]);
+      const descricao = await safeExtractText(cells[5]);
+
+      if (
+        textsMatch(dataHora, item.dataHora) &&
+        textsMatch(tipoSequencia, item.tipoSequencia) &&
+        (textsMatch(analistaContato, item.analistaContato) || textsMatch(descricao, item.descricao))
+      ) {
+        return trs[i];
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Abre a tela de anexos para a linha do item
+   * Usa locateRowInCurrentPage para encontrar a linha correta
+   */
+  async openAttachmentScreenForRow(item) {
+    const tr = await this.locateRowInCurrentPage(item);
+    if (!tr) {
+      throw new Error(`Linha não encontrada para item ${item.uniqueKey}`);
+    }
+
+    const attachmentInput = await tr.findElement(By.css('td:nth-child(8) input[type="image"]'));
+    await this.driver.getDriver().executeScript(
+      'arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',
+      attachmentInput
+    );
+    await sleep(800);
   }
 }

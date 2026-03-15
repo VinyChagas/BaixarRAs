@@ -1,8 +1,9 @@
 /**
  * Serviço de exportação completa de RAs
- * Duas etapas bem separadas:
- * ETAPA 1: Scraping textual completo -> salvar JSON/TXT
- * ETAPA 2: Download dos anexos
+ * Três fases bem separadas:
+ * FASE 1: Scraping textual completo -> salvar JSON/TXT
+ * FASE 2: Agrupamento dos itens com anexo por página
+ * FASE 3: Download dos anexos agrupados por página
  */
 
 import fs from 'fs';
@@ -14,6 +15,7 @@ import { AutbankSearchFlow } from '../automation/AutbankSearchFlow.js';
 import { AutbankDetailsFlow } from '../automation/AutbankDetailsFlow.js';
 import { AutbankTimelineCollector } from '../automation/AutbankTimelineCollector.js';
 import { AutbankAttachmentDownloader } from '../automation/AutbankAttachmentDownloader.js';
+import { extractItemsWithAttachments, groupAttachmentItemsByPage } from '../automation/attachmentHelpers.js';
 import { saveTimelineJson, saveTimelineTxt } from '../automation/timelineStorage.js';
 import { logger } from '../utils/logger.js';
 import { ensureDirectoryExists } from '../utils/fileUtils.js';
@@ -111,7 +113,8 @@ async function processRa(ra, outputDir, driver, searchFlow, detailsFlow, timelin
     addLog('Extraindo dados gerais...');
     const dadosGerais = await detailsFlow.extractRaGeneralData();
 
-    addLog('ETAPA 1: Coletando histórico completo (apenas texto)...');
+    addLog('Iniciando coleta textual completa da RA...');
+    addLog('FASE 1: Coletando histórico completo (apenas texto, sem clicar em anexos)...');
     let history;
     let totalPages;
     try {
@@ -131,8 +134,9 @@ async function processRa(ra, outputDir, driver, searchFlow, detailsFlow, timelin
       throw timelineError;
     }
 
-    addLog('Salvando histórico em JSON e TXT...');
+    addLog('Histórico salvo em JSON.');
     saveTimelineJson(ra, history, totalPages, raDir);
+    addLog('Histórico salvo em TXT.');
     saveTimelineTxt(ra, history, raDir);
 
     const resumo = {
@@ -162,17 +166,20 @@ async function processRa(ra, outputDir, driver, searchFlow, detailsFlow, timelin
       'utf8'
     );
 
-    const itemsComAnexo = history.filter((item) => item.possuiAnexo);
-    addLog(`${itemsComAnexo.length} itens com anexo identificados`);
+    addLog('FASE 2: Agrupando itens com anexo por página...');
+    const itemsComAnexo = extractItemsWithAttachments(history);
+    const { groups, pageNumbers } = groupAttachmentItemsByPage(itemsComAnexo);
 
     if (itemsComAnexo.length > 0) {
-      addLog('ETAPA 2: Iniciando download de anexos...');
+      addLog('FASE 3: Iniciando download de anexos agrupados por página...');
       const downloader = new AutbankAttachmentDownloader(driver, anexosDir);
       await downloader.prepareDownloadDir();
-      await downloader.downloadAttachmentsFromCollectedTimeline(itemsComAnexo, timelineCollector);
+      await downloader.processAttachmentGroupsByPage(groups, pageNumbers, timelineCollector);
 
-      addLog('Atualizando JSON com anexos baixados...');
+      addLog('Atualizando JSON e TXT com anexos baixados...');
       saveTimelineJson(ra, history, totalPages, raDir);
+      saveTimelineTxt(ra, history, raDir);
+      addLog('Download de anexos concluído.');
     }
 
     const totalAnexos = history.reduce((s, h) => s + (h.anexosBaixados?.length || 0), 0);
