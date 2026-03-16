@@ -16,7 +16,7 @@ import { AutbankDetailsFlow } from '../automation/AutbankDetailsFlow.js';
 import { AutbankTimelineCollector } from '../automation/AutbankTimelineCollector.js';
 import { AutbankAttachmentDownloader } from '../automation/AutbankAttachmentDownloader.js';
 import { extractItemsWithAttachments, groupAttachmentItemsByPage } from '../automation/attachmentHelpers.js';
-import { saveTimelineJson, saveTimelineTxt } from '../automation/timelineStorage.js';
+import { saveTimelineJson } from '../automation/timelineStorage.js';
 import { logger } from '../utils/logger.js';
 import { ensureDirectoryExists } from '../utils/fileUtils.js';
 
@@ -128,16 +128,13 @@ async function processRa(ra, outputDir, driver, searchFlow, detailsFlow, timelin
         addLog(`Salvando histórico parcial (${partial.history.length} itens)...`);
         history = partial.history;
         totalPages = partial.totalPages ?? 1;
-        saveTimelineJson(ra, history, totalPages, raDir);
-        saveTimelineTxt(ra, history, raDir);
+        saveTimelineJson(ra, history, totalPages, raDir, dadosGerais);
       }
       throw timelineError;
     }
 
     addLog('Histórico salvo em JSON.');
-    saveTimelineJson(ra, history, totalPages, raDir);
-    addLog('Histórico salvo em TXT.');
-    saveTimelineTxt(ra, history, raDir);
+    saveTimelineJson(ra, history, totalPages, raDir, dadosGerais);
 
     const resumo = {
       ra,
@@ -176,9 +173,8 @@ async function processRa(ra, outputDir, driver, searchFlow, detailsFlow, timelin
       await downloader.prepareDownloadDir();
       await downloader.processAttachmentGroupsByPage(groups, pageNumbers, timelineCollector);
 
-      addLog('Atualizando JSON e TXT com anexos baixados...');
-      saveTimelineJson(ra, history, totalPages, raDir);
-      saveTimelineTxt(ra, history, raDir);
+      addLog('Atualizando JSON com anexos baixados...');
+      saveTimelineJson(ra, history, totalPages, raDir, dadosGerais);
       addLog('Download de anexos concluído.');
     }
 

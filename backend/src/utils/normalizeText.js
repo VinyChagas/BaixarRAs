@@ -12,10 +12,16 @@ export function normalizeText(text) {
 
 /**
  * Extrai texto de um elemento de forma segura (suporta Promises do Selenium)
+ * Para input/textarea usa getAttribute('value'), para outros usa getText()
  */
 export async function safeExtractText(element) {
   if (!element) return null;
   try {
+    const tagName = await element.getTagName?.().then((t) => t?.toLowerCase?.());
+    if (tagName === 'input' || tagName === 'textarea') {
+      const value = await element.getAttribute?.('value');
+      return normalizeText(value);
+    }
     const text = await (element.getText?.() ?? Promise.resolve(null));
     return normalizeText(text);
   } catch {

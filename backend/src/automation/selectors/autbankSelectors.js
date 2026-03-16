@@ -92,67 +92,84 @@ export const gridSelectors = {
   },
 };
 
-/** Tela de detalhe da RA - botão Seta (expansão) e campos gerais */
+/** Tela de detalhe da RA - botão Seta (expansão) input type="image" e campos gerais */
 export const detailSelectors = {
+  /** input type="image" src="abToggleShow.gif" - expandir detalhes */
   setaButton: {
     id: 'page:frmre_consseqra_contato_r:re_btntoggler_consseqra_contato_r',
-    css: '#page\\:frmre_consseqra_contato_r\\:re_btntoggler_consseqra_contato_r input',
+    css: '#page\\:frmre_consseqra_contato_r\\:re_btntoggler_consseqra_contato_r > input',
+    cssAlt: '#page\\:frmre_consseqra_contato_r\\:re_btntoggler_consseqra_contato_r input',
+    cssBySrc: 'input[type="image"][src*="abToggleShow"]',
+    cssByClass: 'input.btnToggler[type="image"]',
     xpath: '//*[@id="page:frmre_consseqra_contato_r:re_btntoggler_consseqra_contato_r"]/input',
+    xpathAbsolute: '/html/body/div[3]/div/form/div[4]/input',
+    xpathBySrc: '//input[@type="image" and contains(@src,"abToggleShow")]',
   },
   numeroRA: {
     id: 'page:frmre_consseqra_contato_r:numerora',
     css: '#page\\:frmre_consseqra_contato_r\\:numerora',
     xpath: '//*[@id="page:frmre_consseqra_contato_r:numerora"]',
+    xpathAbsolute: '/html/body/div[3]/div/form/div[5]/div[17]/input',
   },
   sistemaOriginal: {
     id: 'page:frmre_consseqra_contato_r:descsistema',
     css: '#page\\:frmre_consseqra_contato_r\\:descsistema',
     xpath: '//*[@id="page:frmre_consseqra_contato_r:descsistema"]',
+    xpathAbsolute: '/html/body/div[3]/div/form/div[5]/div[13]/input',
   },
   sistemaAtual: {
     id: 'page:frmre_consseqra_contato_r:sistemaatu',
     css: '#page\\:frmre_consseqra_contato_r\\:sistemaatu',
     xpath: '//*[@id="page:frmre_consseqra_contato_r:sistemaatu"]',
+    xpathAbsolute: '/html/body/div[3]/div/form/div[5]/div[15]/input',
   },
   versao: {
     id: 'page:frmre_consseqra_contato_r:versaosistema',
     css: '#page\\:frmre_consseqra_contato_r\\:versaosistema',
     xpath: '//*[@id="page:frmre_consseqra_contato_r:versaosistema"]',
+    xpathAbsolute: '/html/body/div[3]/div/form/div[5]/div[11]/input',
   },
   dataAbertura: {
     id: 'page:frmre_consseqra_contato_r:dataabertura',
     css: '#page\\:frmre_consseqra_contato_r\\:dataabertura',
     xpath: '//*[@id="page:frmre_consseqra_contato_r:dataabertura"]',
+    xpathAbsolute: '/html/body/div[3]/div/form/div[5]/div[1]/div[1]/input',
   },
   ambiente: {
     id: 'page:frmre_consseqra_contato_r:prioridadeambientelabel',
     css: '#page\\:frmre_consseqra_contato_r\\:prioridadeambientelabel',
     xpath: '//*[@id="page:frmre_consseqra_contato_r:prioridadeambientelabel"]',
+    xpathAbsolute: '/html/body/div[3]/div/form/div[5]/div[5]/input',
   },
   assunto: {
     id: 'page:frmre_consseqra_contato_r:motivo',
     css: '#page\\:frmre_consseqra_contato_r\\:motivo',
     xpath: '//*[@id="page:frmre_consseqra_contato_r:motivo"]',
+    xpathAbsolute: '/html/body/div[3]/div/form/div[5]/div[8]/div[1]/input',
   },
   itemMenu: {
     id: 'page:frmre_consseqra_contato_r:item',
     css: '#page\\:frmre_consseqra_contato_r\\:item',
     xpath: '//*[@id="page:frmre_consseqra_contato_r:item"]',
+    xpathAbsolute: '/html/body/div[3]/div/form/div[5]/div[7]/div[1]/input',
   },
   contato: {
     id: 'page:frmre_consseqra_contato_r:contatoinicial',
     css: '#page\\:frmre_consseqra_contato_r\\:contatoinicial',
     xpath: '//*[@id="page:frmre_consseqra_contato_r:contatoinicial"]',
+    xpathAbsolute: '/html/body/div[3]/div/form/div[5]/div[10]/div[1]/div[1]/input',
   },
   situacao: {
     id: 'page:frmre_consseqra_contato_r:situacaolabel',
     css: '#page\\:frmre_consseqra_contato_r\\:situacaolabel',
     xpath: '//*[@id="page:frmre_consseqra_contato_r:situacaolabel"]',
+    xpathAbsolute: '/html/body/div[3]/div/form/div[5]/div[9]/div[2]/div[1]/input',
   },
   atendente: {
     id: 'page:frmre_consseqra_contato_r:nomeanalistaresponsavel',
     css: '#page\\:frmre_consseqra_contato_r\\:nomeanalistaresponsavel',
     xpath: '//*[@id="page:frmre_consseqra_contato_r:nomeanalistaresponsavel"]',
+    xpathAbsolute: '/html/body/div[3]/div/form/div[5]/div[9]/div[1]/div[1]/input',
   },
 };
 
